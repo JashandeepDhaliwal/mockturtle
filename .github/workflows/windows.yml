@@ -29,5 +29,5 @@ jobs:
       shell: cmd
     - name: Run tests
       run: |
-        cd build
-        .\test\Debug\run_tests "~[quality]"
+        cd build"
+        .\test\Debug\run_tests "~[quality]
