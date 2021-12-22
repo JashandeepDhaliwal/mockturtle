@@ -55,6 +55,56 @@ struct simulation_cec_stats
 
 namespace detail
 {
+/* */
+
+class JASH_simulator
+{
+public:
+  JASH_simulator( unsigned int num_vars, unsigned int var_split, unsigned int round ) : num_vars( num_vars ), var_split(var_split), round( round )
+  {
+  }
+
+  kitty::dynamic_truth_table compute_constant( bool value ) const
+  {
+    kitty::dynamic_truth_table tt( var_split );
+    return value ? ~tt : tt;
+  }
+
+  kitty::dynamic_truth_table compute_pi( uint32_t index ) const
+  {
+    kitty::dynamic_truth_table tt( var_split );
+
+    if(index < var_split )
+    {
+      kitty::create_nth_var(tt, index);
+    }
+    else
+    {
+      if(((round >> (index - var_split)) & 1) == 0)
+      {
+        tt = tt;
+      }
+      else
+      {
+        tt = ~tt;
+      }
+    }
+    return tt;
+  }
+
+  kitty::dynamic_truth_table compute_not( kitty::dynamic_truth_table const& value ) const
+  {
+    return ~value;
+  }
+
+private:
+  unsigned int num_vars;
+  unsigned int var_split;
+  unsigned int round;
+
+};
+
+/* */
 
 template<class Ntk>
 class simulation_cec_impl
@@ -73,8 +123,40 @@ public:
 
   bool run()
   {
-    /* TODO: write your implementation here */
-    return false;
+    uint64_t  n = _ntk.num_pis();
+    uint64_t m = 7;
+    uint64_t V = _ntk.size();
+
+    if (n <= 6)
+    {
+      _st.split_var = n;
+    }
+    else
+    {
+      while (m < n && (32 + pow(2,(m-3 + 1 ))) * V <= pow(2, 29))
+      {
+        m++;
+      }
+      _st.split_var = m;
+    }
+
+    _st.rounds = pow(2,n - _st.split_var);
+
+    for(int round = 0; round < _st.rounds; round++){
+      JASH_simulator simulator(_ntk.num_pis(), _st.split_var, round);
+      const std::vector<kitty::dynamic_truth_table> tts = simulate<kitty::dynamic_truth_table>(_ntk, simulator);
+
+      for(auto& po : tts)
+      {
+        if(!kitty::is_const0(po))
+        {
+          return false;
+        }
+      }
+    }
+    return true;
+
+    // return result;
   }
 
 private:
